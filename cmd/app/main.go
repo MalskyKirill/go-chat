@@ -1,10 +1,13 @@
-package app
+package main
 
 import (
 	"context"
 	"go-chat/internal/config"
 	"go-chat/internal/db"
 	"go-chat/internal/handlers"
+	"go-chat/internal/middleware"
+	"go-chat/internal/repositories"
+	"go-chat/internal/service"
 	"log"
 	"net/http"
 	"os"
@@ -25,7 +28,11 @@ func main() {
 
 	defer postgresPool.Close()
 
+	userRepositories := repositories.NewUserRepository(postgresPool)
+	authService := service.NewAuthService(userRepositories, cfg.JWTSecret, time.Duration(cfg.JWTHours)*time.Hour)
+
 	healthHandler := handlers.NewHealthHandler(postgresPool)
+	authHandler := handlers.NewAuthHandler(authService)
 
 	mux := http.NewServeMux()
 
@@ -35,6 +42,9 @@ func main() {
 	})
 
 	mux.HandleFunc("/health", healthHandler.HealthCheck)
+	mux.HandleFunc("/api/auth/register", authHandler.Register)
+	mux.HandleFunc("/api/auth/login", authHandler.Login)
+	mux.Handle("/api/me", middleware.AuthMiddleware(cfg.JWTSecret)(http.HandlerFunc(authHandler.GetUser)))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,
@@ -51,11 +61,11 @@ func main() {
 
 	}()
 
-	shtutdownServer(server)
+	shutdownServer(server)
 
 }
 
-func shtutdownServer(server *http.Server) {
+func shutdownServer(server *http.Server) {
 	quit := make(chan os.Signal, 1)
 
 	signal.Notify(
@@ -77,5 +87,5 @@ func shtutdownServer(server *http.Server) {
 		return
 	}
 
-	log.Printf("server stoped gracefully")
+	log.Printf("server stopped gracefully")
 }
