@@ -71,7 +71,7 @@ func (r *ChatReposytory) FindPrivateChatBetweenUsers(ctx context.Context, firstU
 		FROM chats AS c
 		JOIN chat_members AS cm ON cm.chat_id = c.id
 		WHERE c.type = 'private' AND cm.user_id IN ($1, $2)
-		GROUP BY c.id, c.type, c.tytle, c.created_at
+		GROUP BY c.id, c.type, c.title, c.created_at
 		HAVING COUNT (DISTINCT cm.user_id) = 2 
 			AND (
 				SELECT COUNT(*)
@@ -99,8 +99,8 @@ func (r *ChatReposytory) FindPrivateChatBetweenUsers(ctx context.Context, firstU
 func (r *ChatReposytory) FindByID(ctx context.Context, chatID int64) (*models.Chat, error) {
 	query := `
 		SELECT c.id, c.type, COALESCE(c.title, ''), c.created_at
-		FROM chats
-		WHERE id = $1
+		FROM chats AS c
+		WHERE c.id = $1
 	`
 
 	var chat models.Chat
@@ -159,7 +159,7 @@ func (r *ChatReposytory) FindMembersByChatId(ctx context.Context, chatID int64) 
 		FROM chat_members AS cm
 		JOIN users AS u ON cm.user_id = u.id
 		WHERE cm.chat_id = $1
-		ORDER BY u.username ASB
+		ORDER BY u.username ASC
 	`
 
 	rows, err := r.db.Query(ctx, query, chatID)

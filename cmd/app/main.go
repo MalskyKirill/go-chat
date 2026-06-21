@@ -53,8 +53,8 @@ func main() {
 
 	mux.Handle("/api/me", authMiddlevare(http.HandlerFunc(authHandler.GetUser)))
 	mux.Handle("/api/chats", authMiddlevare(http.HandlerFunc(chatHandler.GetMyChats)))
-	mux.Handle("/api/private", authMiddlevare(http.HandlerFunc(chatHandler.CreatePrivateChat)))
-	mux.Handle("/api/group", authMiddlevare(http.HandlerFunc(chatHandler.CreatePrivateChat)))
+	mux.Handle("/api/chats/private", authMiddlevare(http.HandlerFunc(chatHandler.CreatePrivateChat)))
+	mux.Handle("/api/chats/group", authMiddlevare(http.HandlerFunc(chatHandler.CreateGroupChat)))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,
