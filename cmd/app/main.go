@@ -29,10 +29,16 @@ func main() {
 	defer postgresPool.Close()
 
 	userRepositories := repositories.NewUserRepository(postgresPool)
+	chatRepository := repositories.NewChatReposytory(postgresPool)
+
 	authService := service.NewAuthService(userRepositories, cfg.JWTSecret, time.Duration(cfg.JWTHours)*time.Hour)
+	chatService := service.NewChatService(chatRepository, userRepositories)
 
 	healthHandler := handlers.NewHealthHandler(postgresPool)
 	authHandler := handlers.NewAuthHandler(authService)
+	chatHandler := handlers.NewChatHandler(chatService)
+
+	authMiddlevare := middleware.AuthMiddleware(cfg.JWTSecret)
 
 	mux := http.NewServeMux()
 
@@ -44,7 +50,11 @@ func main() {
 	mux.HandleFunc("/health", healthHandler.HealthCheck)
 	mux.HandleFunc("/api/auth/register", authHandler.Register)
 	mux.HandleFunc("/api/auth/login", authHandler.Login)
-	mux.Handle("/api/me", middleware.AuthMiddleware(cfg.JWTSecret)(http.HandlerFunc(authHandler.GetUser)))
+
+	mux.Handle("/api/me", authMiddlevare(http.HandlerFunc(authHandler.GetUser)))
+	mux.Handle("/api/chats", authMiddlevare(http.HandlerFunc(chatHandler.GetMyChats)))
+	mux.Handle("/api/private", authMiddlevare(http.HandlerFunc(chatHandler.CreatePrivateChat)))
+	mux.Handle("/api/group", authMiddlevare(http.HandlerFunc(chatHandler.CreatePrivateChat)))
 
 	server := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,
