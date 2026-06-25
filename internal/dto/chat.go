@@ -8,7 +8,7 @@ type CreatePrivateChatRequest struct {
 
 type CreateGroupChatRequest struct {
 	Title      string  `json:"title"`
-	MembersIDs []int64 `json:"members_ids"`
+	MembersIDs []int64 `json:"member_ids"`
 }
 
 type ChatMemberResponse struct {
