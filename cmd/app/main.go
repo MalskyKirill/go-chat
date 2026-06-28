@@ -8,6 +8,7 @@ import (
 	"go-chat/internal/middleware"
 	"go-chat/internal/repositories"
 	"go-chat/internal/service"
+	"go-chat/internal/websocket"
 	"log"
 	"net/http"
 	"os"
@@ -36,10 +37,14 @@ func main() {
 	chatService := service.NewChatService(chatRepository, userRepositories)
 	messageService := service.NewMessageService(messageRepository, chatRepository)
 
+	hub := websocket.NewHub()
+	go hub.Run()
+
 	healthHandler := handlers.NewHealthHandler(postgresPool)
 	authHandler := handlers.NewAuthHandler(authService)
 	chatHandler := handlers.NewChatHandler(chatService)
 	messageHandler := handlers.NewMessageHandler(messageService)
+	wsHandler := handlers.NewWebSocketHandler(hub, cfg.JWTSecret)
 
 	authMiddlevare := middleware.AuthMiddleware(cfg.JWTSecret)
 
@@ -51,6 +56,8 @@ func main() {
 	})
 
 	mux.HandleFunc("/health", healthHandler.HealthCheck)
+	mux.HandleFunc("/ws", wsHandler.Handle)
+
 	mux.HandleFunc("/api/auth/register", authHandler.Register)
 	mux.HandleFunc("/api/auth/login", authHandler.Login)
 

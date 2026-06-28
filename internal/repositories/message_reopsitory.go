@@ -20,7 +20,7 @@ func NewMessageRepository(db *pgxpool.Pool) *MessageRepository {
 }
 func (r *MessageRepository) Create(ctx context.Context, message *models.Message) error {
 	query := `
-		INSERT INTO message(chat_id, sender_id, content)
+		INSERT INTO messages(chat_id, sender_id, content)
 		VALUES($1, $2, $3)
 		RETURNING id, created_at
 	`
@@ -67,7 +67,7 @@ func (r *MessageRepository) FindByChatID(ctx context.Context, chatID int64, limi
 		JOIN users AS u ON u.id = m.sender_id
 		WHERE chat_id = $1
 		ORDER BY m.created_at ASC
-		LIMIL $2 OFFSET $3
+		LIMIT $2 OFFSET $3
 	`
 
 	rows, err := r.db.Query(ctx, query, chatID, limit, offset)

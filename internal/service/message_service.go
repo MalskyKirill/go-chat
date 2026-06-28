@@ -115,7 +115,7 @@ func (s *MessageService) GetChatMessages(ctx context.Context, currentUserId int6
 		return nil, ErrNotChatMember
 	}
 
-	messages, err := s.GetChatMessages(ctx, currentUserId, chatID, limit, offset)
+	messages, err := s.messageRepo.FindByChatID(ctx, chatID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
