@@ -44,7 +44,7 @@ func main() {
 	authHandler := handlers.NewAuthHandler(authService)
 	chatHandler := handlers.NewChatHandler(chatService)
 	messageHandler := handlers.NewMessageHandler(messageService)
-	wsHandler := handlers.NewWebSocketHandler(hub, cfg.JWTSecret)
+	wsHandler := handlers.NewWebSocketHandler(hub, cfg.JWTSecret, messageService)
 
 	authMiddlevare := middleware.AuthMiddleware(cfg.JWTSecret)
 

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"go-chat/internal/auth"
+	"go-chat/internal/service"
 	"go-chat/internal/websocket"
 	"net/http"
 	"strings"
@@ -10,14 +11,16 @@ import (
 )
 
 type WebSocketHandler struct {
-	hub       *websocket.Hub
-	jwtSecret string
+	hub            *websocket.Hub
+	jwtSecret      string
+	messageService *service.MessageService
 }
 
-func NewWebSocketHandler(hub *websocket.Hub, jswSecret string) *WebSocketHandler {
+func NewWebSocketHandler(hub *websocket.Hub, jswSecret string, messageService *service.MessageService) *WebSocketHandler {
 	return &WebSocketHandler{
-		hub:       hub,
-		jwtSecret: jswSecret,
+		hub:            hub,
+		jwtSecret:      jswSecret,
+		messageService: messageService,
 	}
 }
 
@@ -52,7 +55,7 @@ func (h *WebSocketHandler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	client := websocket.NewClient(h.hub, claims.UserID, conn)
+	client := websocket.NewClient(h.hub, claims.UserID, conn, h.messageService)
 
 	h.hub.Register <- client
 

@@ -3,18 +3,20 @@ package websocket
 type Hub struct {
 	clients map[int64]map[*Client]bool
 
-	Register   chan *Client
-	Unregister chan *Client
-	Broadcast  chan []byte
+	Register    chan *Client
+	Unregister  chan *Client
+	Broadcast   chan []byte
+	SendToUsers chan UserMessage
 }
 
 func NewHub() *Hub {
 	return &Hub{
 		clients: make(map[int64]map[*Client]bool),
 
-		Register:   make(chan *Client),
-		Unregister: make(chan *Client),
-		Broadcast:  make(chan []byte),
+		Register:    make(chan *Client),
+		Unregister:  make(chan *Client),
+		Broadcast:   make(chan []byte),
+		SendToUsers: make(chan UserMessage),
 	}
 }
 
@@ -29,6 +31,9 @@ func (h *Hub) Run() {
 
 		case message := <-h.Broadcast:
 			h.broadcastToAll(message)
+
+		case userMessage := <-h.SendToUsers:
+			h.sendToUsers(userMessage.UserIDs, userMessage.Message)
 
 		}
 	}
@@ -101,6 +106,23 @@ func (h *Hub) broadcastToAll(message []byte) {
 			case client.Send <- message:
 			default:
 				h.removeClient(client)
+			}
+		}
+	}
+}
+
+func (h *Hub) sendToUsers(userIDs []int64, message []byte) {
+	for _, userID := range userIDs {
+		userClient, ok := h.clients[userID]
+		if !ok {
+			continue
+		}
+
+		for client := range userClient {
+			select {
+			case client.Send <- message:
+			default:
+				h.registerClient(client)
 			}
 		}
 	}

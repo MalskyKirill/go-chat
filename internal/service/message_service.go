@@ -130,6 +130,27 @@ func (s *MessageService) GetChatMessages(ctx context.Context, currentUserId int6
 	return response, nil
 }
 
+func (s *MessageService) SendMessageAndGetChatMemberIDs(ctx context.Context, currentUserID int64, chatID int64, req dto.SendMessageRequest) (*dto.MessageResponse, []int64, error) {
+	message, err := s.SendMessage(ctx, currentUserID, chatID, req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	members, err := s.chatRepo.FindMembersByChatId(ctx, chatID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	membersIDs := make([]int64, 0, len(members))
+
+	for _, member := range members {
+		membersIDs = append(membersIDs, member.UserID)
+	}
+
+	return message, membersIDs, nil
+
+}
+
 func toMessageResponse(message *models.Message) dto.MessageResponse {
 	return dto.MessageResponse{
 		ID:             message.ID,

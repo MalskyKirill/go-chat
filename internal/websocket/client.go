@@ -1,6 +1,11 @@
 package websocket
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"go-chat/internal/dto"
+	"go-chat/internal/service"
 	"log"
 	"time"
 
@@ -19,14 +24,17 @@ type Client struct {
 	Hub    *Hub
 	Conn   *gorilla.Conn
 	Send   chan []byte
+
+	messageService *service.MessageService
 }
 
-func NewClient(hub *Hub, userID int64, conn *gorilla.Conn) *Client {
+func NewClient(hub *Hub, userID int64, conn *gorilla.Conn, messageService *service.MessageService) *Client {
 	return &Client{
-		UserID: userID,
-		Hub:    hub,
-		Conn:   conn,
-		Send:   make(chan []byte, 256),
+		UserID:         userID,
+		Hub:            hub,
+		Conn:           conn,
+		Send:           make(chan []byte, 256),
+		messageService: messageService,
 	}
 }
 
@@ -45,7 +53,7 @@ func (c *Client) ReadPump() {
 	})
 
 	for {
-		_, _, err := c.Conn.ReadMessage()
+		_, rawMessage, err := c.Conn.ReadMessage()
 		if err != nil {
 			if gorilla.IsUnexpectedCloseError(
 				err,
@@ -57,6 +65,8 @@ func (c *Client) ReadPump() {
 
 			break
 		}
+
+		c.handleIncomingMessage(rawMessage)
 	}
 
 }
@@ -101,4 +111,60 @@ func (c *Client) WritePump() {
 			}
 		}
 	}
+}
+
+func (c *Client) handleIncomingMessage(rawMessage []byte) {
+	var event IncomingEvent
+
+	if err := json.Unmarshal(rawMessage, &event); err != nil {
+		c.sendError("invalid_json", "invalid json message")
+		return
+	}
+
+	switch event.Type {
+	case "message.send":
+		c.handleMessageSend(event)
+	default:
+		c.sendError("unknown_event", "unknown event type")
+	}
+}
+
+func (c *Client) handleMessageSend(event IncomingEvent) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	message, meberIDs, err := c.messageService.SendMessageAndGetChatMemberIDs(ctx, c.UserID, event.ChatID, dto.SendMessageRequest{Content: event.Content})
+	if err != nil {
+		c.sendServiceError(err)
+		return
+	}
+
+	c.Hub.SendToUsers <- UserMessage{
+		UserIDs: meberIDs,
+		Message: EncodeEvent("message.new", message),
+	}
+}
+
+func (c *Client) sendServiceError(err error) {
+	switch {
+	case errors.Is(err, service.ErrInvalidInput):
+		c.sendError("invalid_input", "invalid input")
+	case errors.Is(err, service.ErrChatNotFound):
+		c.sendError("chat_not_found", "chat not found")
+	case errors.Is(err, service.ErrNotChatMember):
+		c.sendError("forbidden", "you are not a member of this chat")
+	case errors.Is(err, service.ErrMessageEmpty):
+		c.sendError("message_empty", "message content is empty")
+	case errors.Is(err, service.ErrMessageTooLong):
+		c.sendError("message_too_long", "message content is too long")
+	default:
+		c.sendError("internal_error", "internal server error")
+	}
+}
+
+func (c *Client) sendError(code string, message string) {
+	c.Send <- EncodeEvent("error", map[string]any{
+		"code":    code,
+		"message": message,
+	})
 }
