@@ -37,7 +37,7 @@ func main() {
 	chatService := service.NewChatService(chatRepository, userRepositories)
 	messageService := service.NewMessageService(messageRepository, chatRepository)
 
-	hub := websocket.NewHub()
+	hub := websocket.NewHub(chatService)
 	go hub.Run()
 
 	healthHandler := handlers.NewHealthHandler(postgresPool)
@@ -45,6 +45,7 @@ func main() {
 	chatHandler := handlers.NewChatHandler(chatService)
 	messageHandler := handlers.NewMessageHandler(messageService)
 	wsHandler := handlers.NewWebSocketHandler(hub, cfg.JWTSecret, messageService)
+	onlineHandler := handlers.NewOnlineHandler(chatService, hub)
 
 	authMiddlevare := middleware.AuthMiddleware(cfg.JWTSecret)
 
@@ -67,6 +68,20 @@ func main() {
 	mux.Handle("/api/chats/group", authMiddlevare(http.HandlerFunc(chatHandler.CreateGroupChat)))
 	mux.Handle("POST /api/chats/{chatID}/messages", authMiddlevare(http.HandlerFunc(messageHandler.SendMessage)))
 	mux.Handle("GET /api/chats/{chatID}/messages", authMiddlevare(http.HandlerFunc(messageHandler.GetMessanges)))
+
+	mux.Handle(
+		"GET /api/users/online",
+		authMiddlevare(
+			http.HandlerFunc(onlineHandler.GetOnlineRelatedUsers),
+		),
+	)
+
+	mux.Handle(
+		"GET /api/chats/{chatID}/online",
+		authMiddlevare(
+			http.HandlerFunc(onlineHandler.GetOnlineChatMembers),
+		),
+	)
 
 	server := &http.Server{
 		Addr:              ":" + cfg.HTTPPort,

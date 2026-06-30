@@ -99,3 +99,47 @@ func (r *UserRepository) FindByID(ctx context.Context, id int64) (*models.User, 
 	return &user, nil
 
 }
+
+func (r *UserRepository) FindByIDs(ctx context.Context, ids []int64) ([]models.User, error) {
+	if len(ids) == 0 {
+		return []models.User{}, nil
+	}
+
+	query := `
+		SELECT id, username, email, password_hash, created_at
+		FROM users 
+		WHERE id = ANY($1)
+		ORDER BY usernsme ASC
+	`
+
+	rows, err := r.db.Query(ctx, query, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	users := make([]models.User, 0)
+
+	for rows.Next() {
+		var user models.User
+
+		if err := rows.Scan(
+			&user.ID,
+			&user.Username,
+			&user.Email,
+			&user.PasswordHash,
+			&user.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}

@@ -204,3 +204,38 @@ func (r *ChatReposytory) IsUserMember(ctx context.Context, chatID int64, userID 
 
 	return exists, nil
 }
+
+func (r *ChatReposytory) FindRelatedUserIDsByUserID(ctx context.Context, userID int64) ([]int64, error) {
+	query := `
+		SELECT DISTINCT cm2.user_id
+		FROM chat_members AS cm1
+		JOIN chat_members AS cm2 ON cm2.chat_id = cm1.chat_id
+		WHERE cm1.user_id = $1 AND cm2.user_id <> $1
+		ORDER BY cm2.user_id ASC
+	`
+
+	rows, err := r.db.Query(ctx, query, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	rows.Close()
+
+	userIDs := make([]int64, 0)
+
+	for rows.Next() {
+		var relatedUserID int64
+
+		if err := rows.Scan(&relatedUserID); err != nil {
+			return nil, err
+		}
+
+		userIDs = append(userIDs, relatedUserID)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return userIDs, nil
+}

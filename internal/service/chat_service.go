@@ -137,6 +137,69 @@ func (s *ChatService) GetUserChats(ctx context.Context, userID int64) ([]dto.Cha
 	return response, nil
 }
 
+func (s *ChatService) GetStatusAudience(ctx context.Context, userID int64) ([]int64, error) {
+	return s.chatRepo.FindRelatedUserIDsByUserID(ctx, userID)
+}
+
+func (s *ChatService) GetRelatedUserIDs(ctx context.Context, currentUserID int64) ([]int64, error) {
+	return s.chatRepo.FindRelatedUserIDsByUserID(ctx, currentUserID)
+}
+
+func (s *ChatService) GetChatMemberIDs(ctx context.Context, currentUserID int64, chatID int64) ([]int64, error) {
+	if chatID <= 0 {
+		return nil, ErrInvalidInput
+	}
+
+	_, err := s.chatRepo.FindByID(ctx, chatID)
+	if errors.Is(err, repositories.ErrNotFound) {
+		return nil, ErrChatNotFound
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	isMember, err := s.chatRepo.IsUserMember(ctx, chatID, currentUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !isMember {
+		return nil, ErrNotChatMember
+	}
+
+	members, err := s.chatRepo.FindMembersByChatId(ctx, chatID)
+	if err != nil {
+		return nil, err
+	}
+
+	membersIDs := make([]int64, 0, len(members))
+
+	for _, member := range members {
+		membersIDs = append(membersIDs, member.UserID)
+	}
+
+	return membersIDs, nil
+}
+
+func (s *ChatService) GetUsersByIDs(ctx context.Context, userIDs []int64) ([]dto.OnlineUserResponse, error) {
+	users, err := s.userRepo.FindByIDs(ctx, userIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	response := make([]dto.OnlineUserResponse, 0, len(users))
+
+	for _, user := range users {
+		response = append(response, dto.OnlineUserResponse{
+			ID:       user.ID,
+			Username: user.Username,
+		})
+	}
+
+	return response, nil
+}
+
 func (s *ChatService) buildChatResponse(ctx context.Context, chat *models.Chat) (*dto.ChatResponse, error) {
 	members, err := s.chatRepo.FindMembersByChatId(ctx, chat.ID)
 	if err != nil {
